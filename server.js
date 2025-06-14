@@ -26,10 +26,21 @@ const storage = multer.diskStorage({
         const category = req.body.category || 'uploads';
         const uploadPath = path.join(IMAGES_DIR, category);
         
+        console.log(`Multer destination - category: ${category}`);
+        console.log(`Multer destination - IMAGES_DIR: ${IMAGES_DIR}`);
+        console.log(`Multer destination - uploadPath: ${uploadPath}`);
+        console.log(`Multer destination - __dirname: ${__dirname}`);
+        
         // 确保目录存在
         fs.mkdir(uploadPath, { recursive: true })
-            .then(() => cb(null, uploadPath))
-            .catch(err => cb(err));
+            .then(() => {
+                console.log(`Multer destination - 目录创建成功: ${uploadPath}`);
+                cb(null, uploadPath);
+            })
+            .catch(err => {
+                console.error(`Multer destination - 目录创建失败:`, err);
+                cb(err);
+            });
     },
     filename: function (req, file, cb) {
         // 生成唯一文件名，保持原始扩展名
@@ -271,14 +282,20 @@ app.get('/api/export/csv', async (req, res) => {
 // API: 上传图片
 app.post('/api/upload', upload.array('images', 10), async (req, res) => {
     try {
+        console.log('收到上传请求');
+        console.log('req.files:', req.files ? req.files.length : 0);
+        console.log('req.body:', req.body);
+        
         if (!req.files || req.files.length === 0) {
             return res.status(400).json({ error: '没有上传任何文件' });
         }
 
         const uploadedFiles = [];
         const category = req.body.category || 'uploads';
+        console.log(`上传分类: ${category}`);
         
         for (const file of req.files) {
+            console.log(`处理文件: ${file.originalname}, 路径: ${file.path}`);
             const relativePath = path.relative(IMAGES_DIR, file.path).replace(/\\/g, '/');
             uploadedFiles.push({
                 originalName: file.originalname,
@@ -297,6 +314,12 @@ app.post('/api/upload', upload.array('images', 10), async (req, res) => {
         });
     } catch (error) {
         console.error('上传文件失败:', error);
+        console.error('错误详情:', {
+            message: error.message,
+            code: error.code,
+            path: error.path,
+            stack: error.stack
+        });
         res.status(500).json({ error: '上传失败: ' + error.message });
     }
 });
@@ -306,7 +329,7 @@ app.post('/api/categories', async (req, res) => {
     try {
         const { categoryName } = req.body;
         
-        if (!categoryName || typeof categoryName !== 'string') {
+        if (!categoryName || categoryName.trim() === '') {
             return res.status(400).json({ error: '分类名称不能为空' });
         }
         
@@ -316,6 +339,10 @@ app.post('/api/categories', async (req, res) => {
         }
         
         const categoryPath = path.join(IMAGES_DIR, categoryName);
+        console.log(`尝试创建分类目录: ${categoryPath}`);
+        console.log(`当前工作目录: ${process.cwd()}`);
+        console.log(`__dirname: ${__dirname}`);
+        console.log(`IMAGES_DIR: ${IMAGES_DIR}`);
         
         // 检查分类是否已存在
         try {
@@ -325,13 +352,22 @@ app.post('/api/categories', async (req, res) => {
             // 分类不存在，可以创建
         }
         
+        // 确保父目录存在
+        await fs.mkdir(IMAGES_DIR, { recursive: true });
+        
         // 创建分类目录
         await fs.mkdir(categoryPath, { recursive: true });
         
-        console.log(`创建新分类: ${categoryName}`);
+        console.log(`创建新分类成功: ${categoryName} -> ${categoryPath}`);
         res.json({ success: true, message: `分类 "${categoryName}" 创建成功` });
     } catch (error) {
         console.error('创建分类失败:', error);
+        console.error('错误详情:', {
+            message: error.message,
+            code: error.code,
+            path: error.path,
+            stack: error.stack
+        });
         res.status(500).json({ error: '创建分类失败: ' + error.message });
     }
 });
