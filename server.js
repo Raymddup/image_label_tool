@@ -448,6 +448,16 @@ app.delete('/api/images', async (req, res) => {
     }
 });
 
+// 根路径路由 - 提供 index.html
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// 处理所有其他路径，也返回 index.html（用于单页应用）
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
 // 错误处理中间件
 app.use((error, req, res, next) => {
     console.error('服务器错误:', error);
