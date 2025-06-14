@@ -522,8 +522,8 @@ app.use((error, req, res, next) => {
     res.status(500).json({ error: '服务器内部错误' });
 });
 
-// 启动服务器（仅在本地开发时）
-if (process.env.NODE_ENV !== 'production') {
+// 启动服务器
+if (require.main === module) {
     app.listen(PORT, () => {
         console.log(`🚀 图像标注服务器已启动`);
         console.log(`📱 访问地址: http://localhost:${PORT}`);
