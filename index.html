@@ -611,10 +611,12 @@
                 if (unlabeledImages.length > 0) {
                     showNextImage();
                 } else {
-                    // 所有图片都已标注，显示提示信息
-                    document.getElementById('loadingText').textContent = '所有图片已标注完成。勾选"显示已标注图片"来复查和修改标注。';
-                    document.getElementById('loadingText').style.display = 'block';
-                    document.getElementById('currentImage').style.display = 'none';
+                    // 所有图片都已标注，只在非复查模式下显示提示信息
+                    if (!showLabeledImages) {
+                        document.getElementById('loadingText').textContent = '所有图片已标注完成。勾选"显示已标注图片"来复查和修改标注。';
+                        document.getElementById('loadingText').style.display = 'block';
+                        document.getElementById('currentImage').style.display = 'none';
+                    }
                 }
             } catch (error) {
                 showError('初始化失败: ' + error.message);
@@ -780,6 +782,8 @@
             const loadingText = document.getElementById('loadingText');
             const filenameDiv = document.getElementById('imageFilename');
 
+            // 重置加载文本为正常的加载提示，避免显示之前的完成消息
+            loadingText.textContent = '加载中...';
             loadingText.style.display = 'block';
             img.style.display = 'none';
             
@@ -917,10 +921,12 @@
                     loadingText.style.display = 'none';
                     showNextImage(); // 回到标注模式
                 } else {
-                    // 显示完成提示
-                    loadingText.textContent = '所有图片已标注完成。勾选"显示已标注图片"来复查和修改标注。';
-                    loadingText.style.display = 'block';
-                    document.getElementById('currentImage').style.display = 'none';
+                    // 只在非复查模式下显示完成提示
+                    if (!showLabeledImages) {
+                        loadingText.textContent = '所有图片已标注完成。勾选"显示已标注图片"来复查和修改标注。';
+                        loadingText.style.display = 'block';
+                        document.getElementById('currentImage').style.display = 'none';
+                    }
                 }
             }
         }
