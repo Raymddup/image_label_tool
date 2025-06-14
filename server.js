@@ -280,53 +280,75 @@ app.get('/api/export/csv', async (req, res) => {
 });
 
 // API: 上传图片
-app.post('/api/upload', upload.array('images', 10), async (req, res) => {
-    try {
-        console.log('收到上传请求');
-        console.log('req.files:', req.files ? req.files.length : 0);
-        console.log('req.body:', req.body);
-        
-        if (!req.files || req.files.length === 0) {
-            return res.status(400).json({ error: '没有上传任何文件' });
-        }
-
-        const uploadedFiles = [];
-        const category = req.body.category || 'uploads';
-        console.log(`上传分类: ${category}`);
-        
-        for (const file of req.files) {
-            console.log(`处理文件: ${file.originalname}, 路径: ${file.path}`);
-            const relativePath = path.relative(IMAGES_DIR, file.path).replace(/\\/g, '/');
-            uploadedFiles.push({
-                originalName: file.originalname,
-                filename: relativePath,
-                category: category,
-                size: file.size,
-                uploadTime: new Date().toISOString()
-            });
-        }
-
-        console.log(`成功上传 ${uploadedFiles.length} 个文件到分类: ${category}`);
-        res.json({ 
-            success: true, 
-            message: `成功上传 ${uploadedFiles.length} 个文件`,
-            files: uploadedFiles 
+app.post('/api/upload', (req, res, next) => {
+    // 检查是否在 Vercel 等无服务器环境中
+    if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+        return res.status(400).json({ 
+            error: '云端部署环境不支持文件上传。请在本地添加图片到对应分类文件夹，然后推送到 GitHub 重新部署。' 
         });
-    } catch (error) {
-        console.error('上传文件失败:', error);
-        console.error('错误详情:', {
-            message: error.message,
-            code: error.code,
-            path: error.path,
-            stack: error.stack
-        });
-        res.status(500).json({ error: '上传失败: ' + error.message });
     }
+    
+    // 如果不在云端环境，继续处理上传
+    upload.array('images', 10)(req, res, async (err) => {
+        if (err) {
+            console.error('Multer 上传错误:', err);
+            return res.status(500).json({ error: '文件上传失败: ' + err.message });
+        }
+        
+        try {
+            console.log('收到上传请求');
+            console.log('req.files:', req.files ? req.files.length : 0);
+            console.log('req.body:', req.body);
+            
+            if (!req.files || req.files.length === 0) {
+                return res.status(400).json({ error: '没有上传任何文件' });
+            }
+
+            const uploadedFiles = [];
+            const category = req.body.category || 'uploads';
+            console.log(`上传分类: ${category}`);
+            
+            for (const file of req.files) {
+                console.log(`处理文件: ${file.originalname}, 路径: ${file.path}`);
+                const relativePath = path.relative(IMAGES_DIR, file.path).replace(/\\/g, '/');
+                uploadedFiles.push({
+                    originalName: file.originalname,
+                    filename: relativePath,
+                    category: category,
+                    size: file.size,
+                    uploadTime: new Date().toISOString()
+                });
+            }
+
+            console.log(`成功上传 ${uploadedFiles.length} 个文件到分类: ${category}`);
+            res.json({ 
+                success: true, 
+                message: `成功上传 ${uploadedFiles.length} 个文件`,
+                files: uploadedFiles 
+            });
+        } catch (error) {
+            console.error('上传文件失败:', error);
+            console.error('错误详情:', {
+                message: error.message,
+                code: error.code,
+                path: error.path,
+                stack: error.stack
+            });
+            res.status(500).json({ error: '上传失败: ' + error.message });
+        }
+    });
 });
 
 // API: 创建新分类
 app.post('/api/categories', async (req, res) => {
     try {
+        // 检查是否在 Vercel 等无服务器环境中
+        if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+            return res.status(400).json({ 
+                error: '云端部署环境不支持动态创建分类目录。请在本地项目的 images/ 目录下手动创建分类文件夹，然后推送到 GitHub 重新部署。' 
+            });
+        }
+        
         const { categoryName } = req.body;
         
         if (!categoryName || categoryName.trim() === '') {
