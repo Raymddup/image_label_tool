@@ -733,7 +733,7 @@
         }
 
         // 显示下一张图像（根据模式显示未标注或所有图像）
-        function showNextImage() {
+        function showNextImage(fromLabelAction = false) {
             if (showLabeledImages) {
                 // 复查模式：显示所有图像
                 currentDisplayImages = [...images];
@@ -749,7 +749,10 @@
                 const unlabeledImages = images.filter(img => !labels[img.filename]);
                 
                 if (unlabeledImages.length === 0) {
-                    showCompletion();
+                    // 只有在标注动作完成后才显示完成消息，而不是每次切换时都显示
+                    if (fromLabelAction) {
+                        showCompletion();
+                    }
                     return;
                 }
 
@@ -849,7 +852,7 @@
                     nextImage();
                 } else {
                     // 标注模式下，显示下一张未标注图片
-                    showNextImage();
+                    showNextImage(true); // 传入true表示这是标注动作触发的
                 }
                 
             } catch (error) {
