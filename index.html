@@ -673,7 +673,20 @@
             
             updateCategoryInfo();
             updateStats();
-            showNextImage();
+            
+            // 在复查模式下，直接显示第一张图片，不调用showNextImage避免触发完成检查
+            if (showLabeledImages) {
+                currentDisplayImages = [...images];
+                if (currentDisplayImages.length > 0) {
+                    currentImageIndex = 0;
+                    displayImage(currentDisplayImages[currentImageIndex]);
+                    updateNavigationButtons();
+                } else {
+                    showError('当前分类没有图像');
+                }
+            } else {
+                showNextImage();
+            }
         }
 
         // 更新分类信息显示
@@ -887,7 +900,15 @@
                 navigationButtons.style.display = 'flex';
                 // 隐藏提示信息
                 loadingText.style.display = 'none';
-                showNextImage(); // 重新显示图片
+                // 在复查模式下，直接显示第一张图片，避免触发完成检查
+                currentDisplayImages = [...images];
+                if (currentDisplayImages.length > 0) {
+                    currentImageIndex = 0;
+                    displayImage(currentDisplayImages[currentImageIndex]);
+                    updateNavigationButtons();
+                } else {
+                    showError('当前分类没有图像');
+                }
             } else {
                 navigationButtons.style.display = 'none';
                 // 检查是否还有未标注图片
