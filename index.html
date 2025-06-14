@@ -1498,7 +1498,12 @@
                         }
                     }, 300);
                 } else {
-                    showUploadError(result.error || '创建分类失败');
+                    // 检查是否是云端部署限制
+                    if (result.error && result.error.includes('云端部署环境不支持')) {
+                        showUploadError('⚠️ 云端部署限制\n\n' + result.error + '\n\n详细说明请查看项目中的 VERCEL_LIMITATIONS.md 文件。');
+                    } else {
+                        showUploadError(result.error || '创建分类失败');
+                    }
                 }
             } catch (error) {
                 showUploadError('创建分类失败: ' + error.message);
@@ -1550,7 +1555,12 @@
                         });
                     }, 1000);
                 } else {
-                    showUploadError(result.error || '上传失败');
+                    // 检查是否是云端部署限制
+                    if (result.error && result.error.includes('云端部署环境不支持')) {
+                        showUploadError('⚠️ 云端部署限制\n\n' + result.error + '\n\n详细说明请查看项目中的 VERCEL_LIMITATIONS.md 文件。');
+                    } else {
+                        showUploadError(result.error || '上传失败');
+                    }
                 }
             } catch (error) {
                 hideUploadProgress();
