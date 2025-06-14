@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图像侵权标注工具</title>
+    
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore, collection, doc, setDoc, getDoc, getDocs, updateDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        
+        // Firebase 配置 - 请替换为你的实际配置
+        //const firebaseConfig = {
+        //    apiKey: "your-api-key-here",
+        //    authDomain: "your-project-id.firebaseapp.com",
+        //    projectId: "your-project-id",
+        //    storageBucket: "your-project-id.appspot.com",
+        //   messagingSenderId: "your-sender-id",
+        //    appId: "your-app-id"
+        //};
+        const firebaseConfig = {
+            apiKey: "AIzaSyAMjpSpqzN8M89F-uLcjhpoBNlLymzv_6E",
+            authDomain: "image-label-9b1d5.firebaseapp.com",
+            projectId: "image-label-9b1d5",
+            storageBucket: "image-label-9b1d5.firebasestorage.app",
+            messagingSenderId: "196353123097",
+            appId: "1:196353123097:web:89878dc81a25777e569b88",
+            measurementId: "G-KLF3LJC2FK"
+        };
+        
+        // 初始化 Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        
+        // 将 Firebase 实例暴露到全局作用域
+        window.firebaseDB = db;
+        window.firebaseUtils = { collection, doc, setDoc, getDoc, getDocs, updateDoc };
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            max-width: 800px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .header {
+            margin-bottom: 30px;
+        }
+
+        .title {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 1.1em;
+            margin-bottom: 20px;
+        }
+
+        .progress {
+            background: #f0f0f0;
+            border-radius: 10px;
+            height: 8px;
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .image-container {
+            margin-bottom: 30px;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            background: #f8f9fa;
+            min-height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .image-display {
+            max-width: 100%;
+            max-height: 400px;
+            object-fit: contain;
+            border-radius: 10px;
+        }
+
+        .filename {
+            color: #666;
+            font-size: 1em;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .button-container {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .stats-container {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            border: 2px solid #e9ecef;
+        }
+
+        .stats-btn {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 25px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+
+        .stats-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(40, 167, 69, 0.3);
+        }
+
+        .stats-results {
+            text-align: left;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .stats-section {
+            margin-bottom: 20px;
+        }
+
+        .stats-title {
+            font-size: 1.3em;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 5px;
+        }
+
+        .stats-item {
+            margin: 8px 0;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .stats-summary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .label-btn {
+            padding: 15px 40px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.2em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 150px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .positive-btn {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            color: white;
+        }
+
+        .positive-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 107, 107, 0.3);
+        }
+
+        .negative-btn {
+            background: linear-gradient(135deg, #51cf66, #40c057);
+            color: white;
+        }
+
+        .negative-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(81, 207, 102, 0.3);
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 15px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        .completion-message {
+            background: linear-gradient(135deg, #51cf66, #40c057);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            font-size: 1.3em;
+            font-weight: 600;
+            display: none;
+        }
+
+        .loading {
+            color: #666;
+            font-size: 1.2em;
+        }
+
+        .error {
+            color: #ff6b6b;
+            font-size: 1.1em;
+            padding: 20px;
+            background: #fff5f5;
+            border-radius: 10px;
+            border-left: 4px solid #ff6b6b;
+        }
+
+        .skip-btn {
+            background: #6c757d;
+            color: white;
+        }
+
+        .skip-btn:hover {
+            background: #5a6268;
+        }
+
+        .review-controls {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .review-controls label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .navigation-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .navigation-buttons button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .navigation-buttons button:hover {
+            background: #0056b3;
+        }
+
+        .navigation-buttons button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">🏷️ 图像侵权标注工具</h1>
+            <p class="subtitle">为机器学习实验生成高质量标注数据</p>
+        </div>
+
+        <div class="progress">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+
+        <!-- 分类选择器 -->
+        <div style="margin-bottom: 20px; text-align: center;">
+            <label for="categoryFilter" style="margin-right: 10px; font-weight: 600;">选择分类:</label>
+            <select id="categoryFilter" onchange="filterByCategory()" style="padding: 8px 15px; border-radius: 8px; border: 2px solid #ddd; font-size: 1em;">
+                <option value="all">所有分类</option>
+            </select>
+            <span id="categoryInfo" style="margin-left: 15px; color: #666; font-size: 0.9em;"></span>
+        </div>
+
+        <div id="labelingInterface">
+            <div class="image-container">
+                <img id="currentImage" class="image-display" style="display: none;" alt="待标注图像">
+                <div id="loadingText" class="loading">正在加载图像...</div>
+            </div>
+
+            <div id="imageFilename" class="filename"></div>
+
+            <div class="button-container">
+            <button class="label-btn positive-btn" onclick="labelImage('positive')">
+                ✅ 侵权
+            </button>
+            <button class="label-btn negative-btn" onclick="labelImage('negative')">
+                ❌ 不侵权
+            </button>
+            <button class="skip-btn" onclick="skipImage()">
+                ⏭️ 跳过
+            </button>
+        </div>
+        
+        <div class="review-controls">
+            <label>
+                <input type="checkbox" id="showLabeledImages" onchange="toggleShowLabeled()">
+                显示已标注图片（用于复查和修改）
+            </label>
+            <div class="navigation-buttons" id="navigationButtons" style="display: none;">
+                <button onclick="previousImage()">⬅️ 上一张</button>
+                <button onclick="nextImage()">➡️ 下一张</button>
+            </div>
+        </div>
+        </div>
+
+        <div id="completionMessage" class="completion-message">
+            🎉 恭喜！所有图像已完成标注！
+        </div>
+
+        <div id="errorMessage" class="error" style="display: none;"></div>
+
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-number" id="totalImages">0</div>
+                <div class="stat-label">总图像数</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="labeledImages">0</div>
+                <div class="stat-label">已标注</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="remainingImages">0</div>
+                <div class="stat-label">剩余</div>
+            </div>
+        </div>
+
+        <!-- 数据统计分析功能 -->
+        <div class="stats-container">
+            <button class="stats-btn" onclick="generateStatistics()">📊 生成数据统计报告</button>
+            <div id="statsResults" class="stats-results" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentImageIndex = 0;
+        let images = [];
+        let allImages = []; // 存储所有图像
+        let labels = {};
+        let categories = [];
+        let selectedCategory = 'all';
+        let showLabeledImages = false; // 是否显示已标注图片
+        let currentDisplayImages = []; // 当前显示的图片列表
+
+        // 初始化应用
+        async function initApp() {
+            try {
+                await loadImages();
+                await loadCategories();
+                await loadLabels();
+                updateCategorySelector();
+                updateStats();
+                
+                // 初始化时不自动显示图片，等待用户选择模式
+                // 如果有未标注的图片，显示第一张未标注图片
+                const unlabeledImages = images.filter(img => !labels[img.filename]);
+                if (unlabeledImages.length > 0) {
+                    showNextImage();
+                } else {
+                    // 所有图片都已标注，显示提示信息
+                    document.getElementById('loadingText').textContent = '所有图片已标注完成。勾选"显示已标注图片"来复查和修改标注。';
+                    document.getElementById('loadingText').style.display = 'block';
+                    document.getElementById('currentImage').style.display = 'none';
+                }
+            } catch (error) {
+                showError('初始化失败: ' + error.message);
+            }
+        }
+
+        // 加载分类列表
+        async function loadCategories() {
+            try {
+                const response = await fetch('/api/categories');
+                if (response.ok) {
+                    categories = await response.json();
+                }
+            } catch (error) {
+                console.log('加载分类列表失败:', error);
+                categories = [];
+            }
+        }
+
+        // 更新分类选择器
+        function updateCategorySelector() {
+            const selector = document.getElementById('categoryFilter');
+            
+            // 清空现有选项（保留"所有分类"）
+            selector.innerHTML = '<option value="all">所有分类</option>';
+            
+            // 添加分类选项
+            categories.forEach(category => {
+                if (category !== 'root') {
+                    const option = document.createElement('option');
+                    option.value = category;
+                    option.textContent = category;
+                    selector.appendChild(option);
+                }
+            });
+            
+            // 如果只有root分类，隐藏选择器
+            const container = selector.parentElement;
+            if (categories.length <= 1 && categories[0] === 'root') {
+                container.style.display = 'none';
+            } else {
+                container.style.display = 'block';
+            }
+        }
+
+        // 按分类过滤
+        function filterByCategory() {
+            const selector = document.getElementById('categoryFilter');
+            selectedCategory = selector.value;
+            
+            if (selectedCategory === 'all') {
+                images = [...allImages];
+            } else {
+                images = allImages.filter(img => img.category === selectedCategory);
+            }
+            
+            updateCategoryInfo();
+            updateStats();
+            showNextImage();
+        }
+
+        // 更新分类信息显示
+        function updateCategoryInfo() {
+            const infoSpan = document.getElementById('categoryInfo');
+            if (selectedCategory === 'all') {
+                infoSpan.textContent = `共 ${images.length} 张图像`;
+            } else {
+                const labeled = images.filter(img => labels[img.filename]).length;
+                infoSpan.textContent = `${selectedCategory}: ${images.length} 张图像，已标注 ${labeled} 张`;
+            }
+        }
+
+        // 加载图像列表
+        async function loadImages() {
+            try {
+                const response = await fetch('/api/images');
+                if (!response.ok) {
+                    throw new Error('无法加载图像列表');
+                }
+                allImages = await response.json();
+                images = [...allImages]; // 初始显示所有图像
+                document.getElementById('totalImages').textContent = images.length;
+            } catch (error) {
+                throw new Error('加载图像列表失败: ' + error.message);
+            }
+        }
+
+        // 加载已有标签 (使用 Firebase)
+        async function loadLabels() {
+            try {
+                if (!window.firebaseDB) {
+                    console.log('Firebase 未初始化，使用本地API');
+                    // 回退到原始API
+                    const response = await fetch('/api/labels');
+                    if (response.ok) {
+                        labels = await response.json();
+                    }
+                    return;
+                }
+                
+                const { collection, getDocs } = window.firebaseUtils;
+                const labelsCollection = collection(window.firebaseDB, 'labels');
+                const snapshot = await getDocs(labelsCollection);
+                
+                labels = {};
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    labels[data.imageId] = data.label;
+                });
+                
+                console.log('从 Firebase 加载标签:', Object.keys(labels).length, '条');
+            } catch (error) {
+                console.log('加载标签失败:', error);
+                labels = {};
+            }
+        }
+
+        // 显示下一张图像（根据模式显示未标注或所有图像）
+        function showNextImage() {
+            if (showLabeledImages) {
+                // 复查模式：显示所有图像
+                currentDisplayImages = [...images];
+                if (currentDisplayImages.length === 0) {
+                    showError('当前分类没有图像');
+                    return;
+                }
+                currentImageIndex = 0;
+                displayImage(currentDisplayImages[currentImageIndex]);
+                updateNavigationButtons();
+            } else {
+                // 标注模式：只显示未标注的图像
+                const unlabeledImages = images.filter(img => !labels[img.filename]);
+                
+                if (unlabeledImages.length === 0) {
+                    showCompletion();
+                    return;
+                }
+
+                const nextImage = unlabeledImages[0];
+                displayImage(nextImage);
+            }
+        }
+
+        // 显示图像
+        function displayImage(imageObj) {
+            const img = document.getElementById('currentImage');
+            const loadingText = document.getElementById('loadingText');
+            const filenameDiv = document.getElementById('imageFilename');
+
+            loadingText.style.display = 'block';
+            img.style.display = 'none';
+            
+            img.onload = function() {
+                loadingText.style.display = 'none';
+                img.style.display = 'block';
+            };
+            
+            img.onerror = function() {
+                showError('无法加载图像: ' + imageObj.filename);
+            };
+
+            img.src = `/images/${imageObj.filename}`;
+            
+            // 显示文件名和分类信息
+            const categoryText = imageObj.category === 'root' ? '' : ` [${imageObj.category}]`;
+            const currentLabel = labels[imageObj.filename];
+            const labelText = currentLabel ? `<br><span style="color: ${currentLabel === 'positive' ? '#28a745' : '#dc3545'}; font-weight: bold;">当前标注: ${currentLabel === 'positive' ? '侵权' : '不侵权'}</span>` : '';
+            
+            filenameDiv.innerHTML = `<strong>${imageObj.basename}</strong>${categoryText}<br><small style="color: #999;">${imageObj.filename}</small>${labelText}`;
+            
+            // 存储当前图像信息到全局变量
+            window.currentImageObj = imageObj;
+        }
+
+        // 标注图像 (使用 Firebase)
+        async function labelImage(label) {
+            const currentImage = window.currentImageObj;
+            
+            if (!currentImage) {
+                showError('没有可标注的图像');
+                return;
+            }
+
+            try {
+                // 获取用户名（简单实现）
+                let annotator = localStorage.getItem('annotatorName');
+                if (!annotator) {
+                    annotator = prompt('请输入你的用户名（用于标识标注者）:') || 'anonymous';
+                    localStorage.setItem('annotatorName', annotator);
+                }
+                
+                if (window.firebaseDB) {
+                    // 使用 Firebase 保存
+                    const { doc, setDoc } = window.firebaseUtils;
+                    // 将文件路径中的斜杠替换为下划线，避免 Firebase 文档引用错误
+                    const safeDocId = currentImage.filename.replace(/\//g, '_');
+                    const labelDoc = doc(window.firebaseDB, 'labels', safeDocId);
+                    
+                    await setDoc(labelDoc, {
+                        imageId: currentImage.filename,  // 保持原始路径
+                        safeId: safeDocId,              // 添加安全ID用于引用
+                        label: label,
+                        annotator: annotator,
+                        timestamp: new Date().toISOString(),
+                        lastModified: new Date().toISOString()
+                    }, { merge: true });
+                    
+                    console.log('标注保存到 Firebase:', currentImage.filename, '->', label);
+                } else {
+                    // 回退到原始API
+                    const response = await fetch('/api/label', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            filename: currentImage.filename,
+                            label: label
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('保存标签失败');
+                    }
+                }
+
+                labels[currentImage.filename] = label;
+                updateStats();
+                
+                if (showLabeledImages) {
+                    // 复查模式下，标注后跳转到下一张
+                    nextImage();
+                } else {
+                    // 标注模式下，显示下一张未标注图片
+                    showNextImage();
+                }
+                
+            } catch (error) {
+                showError('标注失败: ' + error.message);
+            }
+        }
+
+        // 更新统计信息
+        function updateStats() {
+            const totalImages = images.length;
+            const currentCategoryLabeled = images.filter(img => labels[img.filename]).length;
+            const remaining = totalImages - currentCategoryLabeled;
+            const progress = totalImages > 0 ? (currentCategoryLabeled / totalImages) * 100 : 0;
+
+            document.getElementById('totalImages').textContent = totalImages;
+            document.getElementById('labeledImages').textContent = currentCategoryLabeled;
+            document.getElementById('remainingImages').textContent = remaining;
+            document.getElementById('progressBar').style.width = progress + '%';
+            
+            // 更新分类信息
+            updateCategoryInfo();
+        }
+
+        // 切换显示已标注图片模式
+        function toggleShowLabeled() {
+            const checkbox = document.getElementById('showLabeledImages');
+            showLabeledImages = checkbox.checked;
+            const navigationButtons = document.getElementById('navigationButtons');
+            const loadingText = document.getElementById('loadingText');
+            
+            if (showLabeledImages) {
+                navigationButtons.style.display = 'flex';
+                // 隐藏提示信息
+                loadingText.style.display = 'none';
+                showNextImage(); // 重新显示图片
+            } else {
+                navigationButtons.style.display = 'none';
+                // 检查是否还有未标注图片
+                const unlabeledImages = images.filter(img => !labels[img.filename]);
+                if (unlabeledImages.length > 0) {
+                    loadingText.style.display = 'none';
+                    showNextImage(); // 回到标注模式
+                } else {
+                    // 显示完成提示
+                    loadingText.textContent = '所有图片已标注完成。勾选"显示已标注图片"来复查和修改标注。';
+                    loadingText.style.display = 'block';
+                    document.getElementById('currentImage').style.display = 'none';
+                }
+            }
+        }
+
+        // 跳过当前图片
+        function skipImage() {
+            if (showLabeledImages) {
+                nextImage();
+            } else {
+                showNextImage();
+            }
+        }
+
+        // 上一张图片
+        function previousImage() {
+            if (!showLabeledImages || currentDisplayImages.length === 0) return;
+            
+            currentImageIndex = (currentImageIndex - 1 + currentDisplayImages.length) % currentDisplayImages.length;
+            displayImage(currentDisplayImages[currentImageIndex]);
+            updateNavigationButtons();
+        }
+
+        // 下一张图片
+        function nextImage() {
+            if (!showLabeledImages || currentDisplayImages.length === 0) return;
+            
+            currentImageIndex = (currentImageIndex + 1) % currentDisplayImages.length;
+            displayImage(currentDisplayImages[currentImageIndex]);
+            updateNavigationButtons();
+        }
+
+        // 更新导航按钮状态
+        function updateNavigationButtons() {
+            if (!showLabeledImages) return;
+            
+            const prevBtn = document.querySelector('.navigation-buttons button:first-child');
+            const nextBtn = document.querySelector('.navigation-buttons button:last-child');
+            
+            if (currentDisplayImages.length <= 1) {
+                prevBtn.disabled = true;
+                nextBtn.disabled = true;
+            } else {
+                prevBtn.disabled = false;
+                nextBtn.disabled = false;
+            }
+            
+            // 更新按钮文本显示当前位置
+            const total = currentDisplayImages.length;
+            const current = currentImageIndex + 1;
+            prevBtn.textContent = `⬅️ 上一张 (${current}/${total})`;
+            nextBtn.textContent = `➡️ 下一张 (${current}/${total})`;
+        }
+
+        // 显示完成消息
+        function showCompletion() {
+            if (showLabeledImages) {
+                // 复查模式下不显示完成消息，继续显示图片
+                return;
+            }
+            
+            // 标注模式下显示完成提示
+            document.getElementById('loadingText').textContent = '🎉 恭喜！所有图片已标注完成！勾选"显示已标注图片"来复查和修改标注。';
+            document.getElementById('loadingText').style.display = 'block';
+            document.getElementById('currentImage').style.display = 'none';
+        }
+
+        // 显示错误消息
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        // 生成数据统计报告
+        async function generateStatistics() {
+            const statsResults = document.getElementById('statsResults');
+            statsResults.innerHTML = '<div style="text-align: center; padding: 20px;">正在生成统计报告...</div>';
+            statsResults.style.display = 'block';
+
+            try {
+                let allLabelsData = {};
+                
+                if (window.firebaseDB) {
+                    // 从 Firebase 获取所有标注数据
+                    const { collection, getDocs } = window.firebaseUtils;
+                    const labelsCollection = collection(window.firebaseDB, 'labels');
+                    const querySnapshot = await getDocs(labelsCollection);
+                    
+                    querySnapshot.forEach((doc) => {
+                        const data = doc.data();
+                        allLabelsData[data.imageId || doc.id] = data;
+                    });
+                } else {
+                    // 使用本地数据
+                    allLabelsData = labels;
+                }
+
+                // 生成统计报告
+                const stats = analyzeLabelsData(allLabelsData);
+                displayStatistics(stats);
+                
+            } catch (error) {
+                statsResults.innerHTML = `<div class="error">生成统计报告失败: ${error.message}</div>`;
+            }
+        }
+
+        // 分析标注数据
+        function analyzeLabelsData(labelsData) {
+            const stats = {
+                total: 0,
+                positive: 0,
+                negative: 0,
+                byIP: {},
+                byAnnotator: {},
+                byCategory: {},
+                timeline: {}
+            };
+
+            Object.entries(labelsData).forEach(([imageId, data]) => {
+                if (!data || !data.label) return;
+                
+                stats.total++;
+                
+                // 统计标签类型
+                if (data.label === 'positive') {
+                    stats.positive++;
+                } else if (data.label === 'negative') {
+                    stats.negative++;
+                }
+                
+                // 从图像路径提取IP信息（假设路径格式为 category/ip/filename）
+                const pathParts = imageId.split('/');
+                let category = 'unknown';
+                let ip = 'unknown';
+                
+                if (pathParts.length >= 2) {
+                    category = pathParts[0];
+                    ip = pathParts[1];
+                } else if (pathParts.length === 1) {
+                    // 如果只有一层，可能是直接的文件名
+                    const filename = pathParts[0];
+                    // 尝试从文件名中提取信息
+                    if (filename.includes('_')) {
+                        const parts = filename.split('_');
+                        ip = parts[0];
+                    }
+                }
+                
+                // 按IP统计
+                if (!stats.byIP[ip]) {
+                    stats.byIP[ip] = { total: 0, positive: 0, negative: 0 };
+                }
+                stats.byIP[ip].total++;
+                if (data.label === 'positive') stats.byIP[ip].positive++;
+                if (data.label === 'negative') stats.byIP[ip].negative++;
+                
+                // 按分类统计
+                if (!stats.byCategory[category]) {
+                    stats.byCategory[category] = { total: 0, positive: 0, negative: 0 };
+                }
+                stats.byCategory[category].total++;
+                if (data.label === 'positive') stats.byCategory[category].positive++;
+                if (data.label === 'negative') stats.byCategory[category].negative++;
+                
+                // 按标注者统计
+                const annotator = data.annotator || 'unknown';
+                if (!stats.byAnnotator[annotator]) {
+                    stats.byAnnotator[annotator] = { total: 0, positive: 0, negative: 0 };
+                }
+                stats.byAnnotator[annotator].total++;
+                if (data.label === 'positive') stats.byAnnotator[annotator].positive++;
+                if (data.label === 'negative') stats.byAnnotator[annotator].negative++;
+                
+                // 按时间统计（按日期分组）
+                if (data.timestamp) {
+                    const date = new Date(data.timestamp).toISOString().split('T')[0];
+                    if (!stats.timeline[date]) {
+                        stats.timeline[date] = { total: 0, positive: 0, negative: 0 };
+                    }
+                    stats.timeline[date].total++;
+                    if (data.label === 'positive') stats.timeline[date].positive++;
+                    if (data.label === 'negative') stats.timeline[date].negative++;
+                }
+            });
+            
+            return stats;
+        }
+
+        // 显示统计结果
+        function displayStatistics(stats) {
+            const statsResults = document.getElementById('statsResults');
+            
+            const positiveRate = stats.total > 0 ? ((stats.positive / stats.total) * 100).toFixed(1) : 0;
+            const negativeRate = stats.total > 0 ? ((stats.negative / stats.total) * 100).toFixed(1) : 0;
+            
+            let html = `
+                <div class="stats-summary">
+                    <h3>📈 总体统计</h3>
+                    <div>总标注数: <strong>${stats.total}</strong></div>
+                    <div>侵权: <strong>${stats.positive}</strong> (${positiveRate}%)</div>
+                    <div>不侵权: <strong>${stats.negative}</strong> (${negativeRate}%)</div>
+                </div>
+            `;
+            
+            // IP统计
+            if (Object.keys(stats.byIP).length > 0) {
+                html += '<div class="stats-section"><div class="stats-title">🎯 按IP统计</div>';
+                Object.entries(stats.byIP)
+                    .sort((a, b) => b[1].total - a[1].total)
+                    .forEach(([ip, data]) => {
+                        const ipPositiveRate = data.total > 0 ? ((data.positive / data.total) * 100).toFixed(1) : 0;
+                        const ipNegativeRate = data.total > 0 ? ((data.negative / data.total) * 100).toFixed(1) : 0;
+                        html += `
+                            <div class="stats-item">
+                                <strong>${ip}</strong>: 总计 ${data.total} | 
+                                侵权 ${data.positive} (${ipPositiveRate}%) | 
+                                不侵权 ${data.negative} (${ipNegativeRate}%)
+                            </div>
+                        `;
+                    });
+                html += '</div>';
+            }
+            
+            // 分类统计
+            if (Object.keys(stats.byCategory).length > 0) {
+                html += '<div class="stats-section"><div class="stats-title">📁 按分类统计</div>';
+                Object.entries(stats.byCategory)
+                    .sort((a, b) => b[1].total - a[1].total)
+                    .forEach(([category, data]) => {
+                        const catPositiveRate = data.total > 0 ? ((data.positive / data.total) * 100).toFixed(1) : 0;
+                        const catNegativeRate = data.total > 0 ? ((data.negative / data.total) * 100).toFixed(1) : 0;
+                        html += `
+                            <div class="stats-item">
+                                <strong>${category}</strong>: 总计 ${data.total} | 
+                                侵权 ${data.positive} (${catPositiveRate}%) | 
+                                不侵权 ${data.negative} (${catNegativeRate}%)
+                            </div>
+                        `;
+                    });
+                html += '</div>';
+            }
+            
+            // 标注者统计
+            if (Object.keys(stats.byAnnotator).length > 0) {
+                html += '<div class="stats-section"><div class="stats-title">👤 按标注者统计</div>';
+                Object.entries(stats.byAnnotator)
+                    .sort((a, b) => b[1].total - a[1].total)
+                    .forEach(([annotator, data]) => {
+                        const annPositiveRate = data.total > 0 ? ((data.positive / data.total) * 100).toFixed(1) : 0;
+                        const annNegativeRate = data.total > 0 ? ((data.negative / data.total) * 100).toFixed(1) : 0;
+                        html += `
+                            <div class="stats-item">
+                                <strong>${annotator}</strong>: 总计 ${data.total} | 
+                                侵权 ${data.positive} (${annPositiveRate}%) | 
+                                不侵权 ${data.negative} (${annNegativeRate}%)
+                            </div>
+                        `;
+                    });
+                html += '</div>';
+            }
+            
+            // 时间线统计
+            if (Object.keys(stats.timeline).length > 0) {
+                html += '<div class="stats-section"><div class="stats-title">📅 按日期统计</div>';
+                Object.entries(stats.timeline)
+                    .sort((a, b) => new Date(b[0]) - new Date(a[0]))
+                    .forEach(([date, data]) => {
+                        const datePositiveRate = data.total > 0 ? ((data.positive / data.total) * 100).toFixed(1) : 0;
+                        const dateNegativeRate = data.total > 0 ? ((data.negative / data.total) * 100).toFixed(1) : 0;
+                        html += `
+                            <div class="stats-item">
+                                <strong>${date}</strong>: 总计 ${data.total} | 
+                                侵权 ${data.positive} (${datePositiveRate}%) | 
+                                不侵权 ${data.negative} (${dateNegativeRate}%)
+                            </div>
+                        `;
+                    });
+                html += '</div>';
+            }
+            
+            // 导出功能
+            html += `
+                <div class="stats-section">
+                    <div class="stats-title">📤 导出数据</div>
+                    <button onclick="exportStatistics()" style="
+                        background: #17a2b8; color: white; padding: 10px 20px; 
+                        border: none; border-radius: 5px; cursor: pointer; margin-right: 10px;
+                    ">导出为 JSON</button>
+                    <button onclick="exportCSV()" style="
+                        background: #28a745; color: white; padding: 10px 20px; 
+                        border: none; border-radius: 5px; cursor: pointer;
+                    ">导出为 CSV</button>
+                </div>
+            `;
+            
+            statsResults.innerHTML = html;
+        }
+
+        // 导出统计数据为JSON
+        async function exportStatistics() {
+            try {
+                let allLabelsData = {};
+                
+                if (window.firebaseDB) {
+                    const { collection, getDocs } = window.firebaseUtils;
+                    const labelsCollection = collection(window.firebaseDB, 'labels');
+                    const querySnapshot = await getDocs(labelsCollection);
+                    
+                    querySnapshot.forEach((doc) => {
+                        const data = doc.data();
+                        allLabelsData[data.imageId || doc.id] = data;
+                    });
+                } else {
+                    allLabelsData = labels;
+                }
+
+                const stats = analyzeLabelsData(allLabelsData);
+                const dataStr = JSON.stringify({
+                    exportTime: new Date().toISOString(),
+                    statistics: stats,
+                    rawData: allLabelsData
+                }, null, 2);
+                
+                const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                const url = URL.createObjectURL(dataBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `image_labeling_statistics_${new Date().toISOString().split('T')[0]}.json`;
+                link.click();
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                showError('导出失败: ' + error.message);
+            }
+        }
+
+        // 导出为CSV格式
+        async function exportCSV() {
+            try {
+                let allLabelsData = {};
+                
+                if (window.firebaseDB) {
+                    const { collection, getDocs } = window.firebaseUtils;
+                    const labelsCollection = collection(window.firebaseDB, 'labels');
+                    const querySnapshot = await getDocs(labelsCollection);
+                    
+                    querySnapshot.forEach((doc) => {
+                        const data = doc.data();
+                        allLabelsData[data.imageId || doc.id] = data;
+                    });
+                } else {
+                    allLabelsData = labels;
+                }
+
+                let csvContent = 'ImageID,Label,Annotator,Timestamp,Category,IP\n';
+                
+                Object.entries(allLabelsData).forEach(([imageId, data]) => {
+                    if (!data || !data.label) return;
+                    
+                    const pathParts = imageId.split('/');
+                    let category = pathParts.length >= 2 ? pathParts[0] : 'unknown';
+                    let ip = pathParts.length >= 2 ? pathParts[1] : (pathParts[0].includes('_') ? pathParts[0].split('_')[0] : 'unknown');
+                    
+                    csvContent += `"${imageId}","${data.label}","${data.annotator || 'unknown'}","${data.timestamp || ''}","${category}","${ip}"\n`;
+                });
+                
+                const dataBlob = new Blob([csvContent], {type: 'text/csv'});
+                const url = URL.createObjectURL(dataBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `image_labeling_data_${new Date().toISOString().split('T')[0]}.csv`;
+                link.click();
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                showError('导出CSV失败: ' + error.message);
+            }
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
