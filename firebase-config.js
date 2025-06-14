@@ -12,13 +12,13 @@ const firebaseConfig = {
 
 // 初始化 Firebase
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, doc, setDoc, getDoc, getDocs, updateDoc } from 'firebase/firestore';
+import { getFirestore, collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc } from 'firebase/firestore';
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 // 导出数据库实例和常用函数
-export { db, collection, doc, setDoc, getDoc, getDocs, updateDoc };
+export { db, collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc };
 
 // 标注数据操作函数
 export const labelOperations = {
@@ -57,6 +57,19 @@ export const labelOperations = {
     } catch (error) {
       console.error('获取标注失败:', error);
       return {};
+    }
+  },
+
+  // 删除标注
+  async deleteLabel(imageId) {
+    try {
+      const labelDoc = doc(db, 'labels', imageId);
+      await deleteDoc(labelDoc);
+      console.log('标注删除成功:', imageId);
+      return { success: true };
+    } catch (error) {
+      console.error('删除标注失败:', error);
+      return { success: false, error: error.message };
     }
   },
 

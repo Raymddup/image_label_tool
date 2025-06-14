@@ -8,7 +8,7 @@
     <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-        import { getFirestore, collection, doc, setDoc, getDoc, getDocs, updateDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import { getFirestore, collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
         
         // Firebase 配置 - 请替换为你的实际配置
         //const firebaseConfig = {
@@ -35,7 +35,7 @@
         
         // 将 Firebase 实例暴露到全局作用域
         window.firebaseDB = db;
-        window.firebaseUtils = { collection, doc, setDoc, getDoc, getDocs, updateDoc };
+        window.firebaseUtils = { collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc };
     </script>
     <style>
         * {
@@ -127,6 +127,133 @@
             gap: 20px;
             justify-content: center;
             margin-bottom: 20px;
+        }
+
+        .upload-container {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+        }
+
+        .upload-btn {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+        }
+
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 123, 255, 0.4);
+        }
+
+        .upload-panel {
+            margin-top: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+
+        .upload-form .form-group {
+            margin-bottom: 15px;
+        }
+
+        .upload-form label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .upload-form select,
+        .upload-form input[type="text"],
+        .upload-form input[type="file"] {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .upload-form button {
+            padding: 8px 16px;
+            margin: 5px 5px 5px 0;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .upload-submit-btn {
+            background: #28a745;
+            color: white;
+        }
+
+        .upload-submit-btn:hover {
+            background: #218838;
+        }
+
+        .upload-cancel-btn {
+            background: #6c757d;
+            color: white;
+        }
+
+        .upload-cancel-btn:hover {
+            background: #5a6268;
+        }
+
+        .file-info {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .upload-progress {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+
+        .progress-text {
+            text-align: center;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .progress-bar-container {
+            background: #e9ecef;
+            border-radius: 10px;
+            height: 20px;
+            overflow: hidden;
+        }
+
+        .upload-results {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .upload-results.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .upload-results.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
         }
 
         .stats-container {
@@ -324,6 +451,15 @@
             background: #6c757d;
             cursor: not-allowed;
         }
+
+        .delete-btn {
+            background: #dc3545 !important;
+            color: white !important;
+        }
+
+        .delete-btn:hover {
+            background: #c82333 !important;
+        }
     </style>
 </head>
 <body>
@@ -374,6 +510,7 @@
             <div class="navigation-buttons" id="navigationButtons" style="display: none;">
                 <button onclick="previousImage()">⬅️ 上一张</button>
                 <button onclick="nextImage()">➡️ 下一张</button>
+                <button onclick="deleteCurrentImage()" class="delete-btn">🗑️ 删除当前图片</button>
             </div>
         </div>
         </div>
@@ -396,6 +533,49 @@
             <div class="stat-item">
                 <div class="stat-number" id="remainingImages">0</div>
                 <div class="stat-label">剩余</div>
+            </div>
+        </div>
+
+        <!-- 图片上传功能 -->
+        <div class="upload-container">
+            <button class="upload-btn" onclick="toggleUploadPanel()">📤 上传图片</button>
+            <div id="uploadPanel" class="upload-panel" style="display: none;">
+                <div class="upload-form">
+                    <div class="form-group">
+                        <label for="categorySelect">选择分类:</label>
+                        <select id="categorySelect">
+                            <option value="uploads">默认分类</option>
+                        </select>
+                        <button type="button" onclick="showNewCategoryInput()">+ 新建分类</button>
+                    </div>
+                    
+                    <div id="newCategoryGroup" class="form-group" style="display: none;">
+                        <label for="newCategoryName">新分类名称:</label>
+                        <input type="text" id="newCategoryName" placeholder="输入分类名称">
+                        <button type="button" onclick="createNewCategory()">创建</button>
+                        <button type="button" onclick="hideNewCategoryInput()">取消</button>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="imageFiles">选择图片文件:</label>
+                        <input type="file" id="imageFiles" multiple accept=".jpg,.jpeg,.png,.gif,.bmp,.webp">
+                        <div class="file-info">支持格式: JPG, PNG, GIF, BMP, WebP (最大10MB)</div>
+                    </div>
+                    
+                    <div class="upload-actions">
+                        <button type="button" onclick="uploadImages()" class="upload-submit-btn">开始上传</button>
+                        <button type="button" onclick="toggleUploadPanel()" class="upload-cancel-btn">取消</button>
+                    </div>
+                    
+                    <div id="uploadProgress" class="upload-progress" style="display: none;">
+                        <div class="progress-text">上传中...</div>
+                        <div class="progress-bar-container">
+                            <div id="uploadProgressBar" class="progress-bar"></div>
+                        </div>
+                    </div>
+                    
+                    <div id="uploadResults" class="upload-results"></div>
+                </div>
             </div>
         </div>
 
@@ -748,12 +928,90 @@
             updateNavigationButtons();
         }
 
+        // 删除当前图片
+        async function deleteCurrentImage() {
+            const currentImage = window.currentImageObj;
+            if (!currentImage || !showLabeledImages) {
+                alert('请先选择要删除的图片');
+                return;
+            }
+
+            const confirmDelete = confirm(`确定要删除图片 "${currentImage.filename}" 吗？\n\n此操作将：\n- 删除图片文件\n- 删除对应的标注记录\n- 删除Firebase数据库记录\n\n此操作不可撤销！`);
+            
+            if (!confirmDelete) return;
+
+            try {
+                // 1. 删除服务器端文件和本地标签记录
+                const response = await fetch(`/api/images/${encodeURIComponent(currentImage.filename)}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    // 2. 删除Firebase记录
+                    if (window.firebaseDB) {
+                        try {
+                            const { doc, deleteDoc } = window.firebaseUtils;
+                            const safeDocId = currentImage.filename.replace(/\//g, '_');
+                            const labelDoc = doc(window.firebaseDB, 'labels', safeDocId);
+                            await deleteDoc(labelDoc);
+                            console.log('Firebase记录删除成功:', safeDocId);
+                        } catch (firebaseError) {
+                            console.error('删除Firebase记录失败:', firebaseError);
+                            // 不阻止删除流程，只记录错误
+                        }
+                    }
+                    
+                    // 3. 从本地labels对象中删除
+                    if (labels[currentImage.filename]) {
+                        delete labels[currentImage.filename];
+                    }
+                    
+                    alert(`图片 "${currentImage.filename}" 删除成功！`);
+                    
+                    // 重新加载图片列表和统计信息
+                    await loadImages();
+                    await loadLabels();
+                    
+                    // 更新统计数据显示
+                    updateStats();
+                    
+                    // 重新筛选当前显示的图片列表
+                    if (showLabeledImages) {
+                        currentDisplayImages = images.filter(img => labels[img.filename]);
+                    }
+                    
+                    // 如果还有图片，显示下一张；否则退出复查模式
+                    if (currentDisplayImages.length > 0) {
+                        // 调整当前索引
+                        if (currentImageIndex >= currentDisplayImages.length) {
+                            currentImageIndex = currentDisplayImages.length - 1;
+                        }
+                        displayImage(currentDisplayImages[currentImageIndex]);
+                        updateNavigationButtons();
+                    } else {
+                        // 没有图片了，退出复查模式
+                        document.getElementById('showLabeledImages').checked = false;
+                        toggleShowLabeled();
+                    }
+                } else {
+                    alert(`删除失败: ${result.error || '未知错误'}`);
+                }
+            } catch (error) {
+                console.error('删除图片时出错:', error);
+                alert('删除图片时出错，请检查网络连接');
+            }
+        }
+
         // 更新导航按钮状态
         function updateNavigationButtons() {
             if (!showLabeledImages) return;
             
-            const prevBtn = document.querySelector('.navigation-buttons button:first-child');
-            const nextBtn = document.querySelector('.navigation-buttons button:last-child');
+            const navButtons = document.querySelectorAll('.navigation-buttons button');
+            const prevBtn = navButtons[0];
+            const nextBtn = navButtons[1];
+            const deleteBtn = navButtons[2];
             
             if (currentDisplayImages.length <= 1) {
                 prevBtn.disabled = true;
@@ -761,6 +1019,11 @@
             } else {
                 prevBtn.disabled = false;
                 nextBtn.disabled = false;
+            }
+            
+            // 删除按钮在有图片时总是可用
+            if (deleteBtn) {
+                deleteBtn.disabled = currentDisplayImages.length === 0;
             }
             
             // 更新按钮文本显示当前位置
@@ -802,19 +1065,37 @@
             try {
                 let allLabelsData = {};
                 
+                // 首先重新加载最新的图片列表和标签数据
+                await loadImages();
+                await loadLabels();
+                
                 if (window.firebaseDB) {
-                    // 从 Firebase 获取所有标注数据
+                    // 从 Firebase 获取最新的标注数据
                     const { collection, getDocs } = window.firebaseUtils;
                     const labelsCollection = collection(window.firebaseDB, 'labels');
                     const querySnapshot = await getDocs(labelsCollection);
                     
                     querySnapshot.forEach((doc) => {
                         const data = doc.data();
-                        allLabelsData[data.imageId || doc.id] = data;
+                        const imageId = data.imageId || doc.id.replace(/_/g, '/');
+                        
+                        // 只包含当前存在的图片的标注数据
+                        const imageExists = images.some(img => img.filename === imageId);
+                        if (imageExists) {
+                            allLabelsData[imageId] = data;
+                        }
                     });
                 } else {
-                    // 使用本地数据
-                    allLabelsData = labels;
+                    // 使用本地数据，但只包含当前存在的图片
+                    Object.keys(labels).forEach(filename => {
+                        const imageExists = images.some(img => img.filename === filename);
+                        if (imageExists) {
+                            allLabelsData[filename] = {
+                                label: labels[filename],
+                                imageId: filename
+                            };
+                        }
+                    });
                 }
 
                 // 生成统计报告
@@ -1095,6 +1376,186 @@
             } catch (error) {
                 showError('导出CSV失败: ' + error.message);
             }
+        }
+
+        // 上传功能相关函数
+        function toggleUploadPanel() {
+            const panel = document.getElementById('uploadPanel');
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                loadCategoriesForUpload();
+            } else {
+                panel.style.display = 'none';
+                hideNewCategoryInput();
+                clearUploadResults();
+            }
+        }
+
+        async function loadCategoriesForUpload() {
+            try {
+                const response = await fetch('/api/categories');
+                if (response.ok) {
+                    const categories = await response.json();
+                    const select = document.getElementById('categorySelect');
+                    
+                    // 清空现有选项
+                    select.innerHTML = '<option value="uploads">默认分类</option>';
+                    
+                    // 添加现有分类
+                    categories.forEach(category => {
+                        if (category !== 'root') {
+                            const option = document.createElement('option');
+                            option.value = category;
+                            option.textContent = category;
+                            select.appendChild(option);
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('加载分类失败:', error);
+            }
+        }
+
+        function showNewCategoryInput() {
+            document.getElementById('newCategoryGroup').style.display = 'block';
+        }
+
+        function hideNewCategoryInput() {
+            document.getElementById('newCategoryGroup').style.display = 'none';
+            document.getElementById('newCategoryName').value = '';
+        }
+
+        async function createNewCategory() {
+            const categoryName = document.getElementById('newCategoryName').value.trim();
+            
+            if (!categoryName) {
+                showUploadError('请输入分类名称');
+                return;
+            }
+            
+            if (!/^[\w\u4e00-\u9fa5]+$/.test(categoryName)) {
+                showUploadError('分类名称只能包含字母、数字、下划线和中文字符');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/categories', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ categoryName })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showUploadSuccess(result.message);
+                    hideNewCategoryInput();
+                    
+                    // 重新加载分类列表并选择新创建的分类
+                    await loadCategoriesForUpload();
+                    
+                    // 确保分类已加载完成后再选择
+                    setTimeout(() => {
+                        const categorySelect = document.getElementById('categorySelect');
+                        const targetOption = Array.from(categorySelect.options).find(option => option.value === categoryName);
+                        if (targetOption) {
+                            categorySelect.value = categoryName;
+                            console.log('已选择新创建的分类:', categoryName);
+                        } else {
+                            console.warn('未找到新创建的分类选项:', categoryName);
+                        }
+                    }, 300);
+                } else {
+                    showUploadError(result.error || '创建分类失败');
+                }
+            } catch (error) {
+                showUploadError('创建分类失败: ' + error.message);
+            }
+        }
+
+        async function uploadImages() {
+            const fileInput = document.getElementById('imageFiles');
+            const categorySelect = document.getElementById('categorySelect');
+            
+            if (!fileInput.files || fileInput.files.length === 0) {
+                showUploadError('请选择要上传的图片文件');
+                return;
+            }
+            
+            const formData = new FormData();
+            const category = categorySelect.value;
+            
+            // 添加分类信息
+            formData.append('category', category);
+            
+            // 添加文件
+            for (let i = 0; i < fileInput.files.length; i++) {
+                formData.append('images', fileInput.files[i]);
+            }
+            
+            // 显示进度条
+            showUploadProgress();
+            
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                hideUploadProgress();
+                
+                if (response.ok) {
+                    showUploadSuccess(result.message);
+                    fileInput.value = ''; // 清空文件选择
+                    
+                    // 刷新图片列表
+                    setTimeout(() => {
+                        loadImages().then(() => {
+                            updateCategorySelector();
+                            updateStats();
+                        });
+                    }, 1000);
+                } else {
+                    showUploadError(result.error || '上传失败');
+                }
+            } catch (error) {
+                hideUploadProgress();
+                showUploadError('上传失败: ' + error.message);
+            }
+        }
+
+        function showUploadProgress() {
+            document.getElementById('uploadProgress').style.display = 'block';
+            document.getElementById('uploadProgressBar').style.width = '100%';
+        }
+
+        function hideUploadProgress() {
+            document.getElementById('uploadProgress').style.display = 'none';
+            document.getElementById('uploadProgressBar').style.width = '0%';
+        }
+
+        function showUploadSuccess(message) {
+            const results = document.getElementById('uploadResults');
+            results.className = 'upload-results success';
+            results.textContent = message;
+            results.style.display = 'block';
+        }
+
+        function showUploadError(message) {
+            const results = document.getElementById('uploadResults');
+            results.className = 'upload-results error';
+            results.textContent = message;
+            results.style.display = 'block';
+        }
+
+        function clearUploadResults() {
+            const results = document.getElementById('uploadResults');
+            results.style.display = 'none';
+            results.textContent = '';
         }
 
         // 页面加载完成后初始化

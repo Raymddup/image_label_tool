@@ -2,6 +2,7 @@ const express = require('express');
 const fs = require('fs').promises;
 const path = require('path');
 const cors = require('cors');
+const multer = require('multer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -18,6 +19,46 @@ app.use('/images', express.static(IMAGES_DIR));
 
 // 支持的图像格式
 const SUPPORTED_FORMATS = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'];
+
+// 配置multer用于文件上传
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        const category = req.body.category || 'uploads';
+        const uploadPath = path.join(IMAGES_DIR, category);
+        
+        // 确保目录存在
+        fs.mkdir(uploadPath, { recursive: true })
+            .then(() => cb(null, uploadPath))
+            .catch(err => cb(err));
+    },
+    filename: function (req, file, cb) {
+        // 生成唯一文件名，保持原始扩展名
+        const timestamp = Date.now();
+        const randomSuffix = Math.round(Math.random() * 1E9);
+        const ext = path.extname(file.originalname);
+        const baseName = path.basename(file.originalname, ext);
+        const fileName = `${baseName}_${timestamp}_${randomSuffix}${ext}`;
+        cb(null, fileName);
+    }
+});
+
+// 文件过滤器，只允许图片文件
+const fileFilter = (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (SUPPORTED_FORMATS.includes(ext)) {
+        cb(null, true);
+    } else {
+        cb(new Error(`不支持的文件格式: ${ext}。支持的格式: ${SUPPORTED_FORMATS.join(', ')}`), false);
+    }
+};
+
+const upload = multer({ 
+    storage: storage,
+    fileFilter: fileFilter,
+    limits: {
+        fileSize: 10 * 1024 * 1024 // 限制文件大小为10MB
+    }
+});
 
 // 检查文件是否为图像
 function isImageFile(filename) {
@@ -224,6 +265,186 @@ app.get('/api/export/csv', async (req, res) => {
     } catch (error) {
         console.error('导出CSV失败:', error);
         res.status(500).json({ error: '无法导出CSV文件' });
+    }
+});
+
+// API: 上传图片
+app.post('/api/upload', upload.array('images', 10), async (req, res) => {
+    try {
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({ error: '没有上传任何文件' });
+        }
+
+        const uploadedFiles = [];
+        const category = req.body.category || 'uploads';
+        
+        for (const file of req.files) {
+            const relativePath = path.relative(IMAGES_DIR, file.path).replace(/\\/g, '/');
+            uploadedFiles.push({
+                originalName: file.originalname,
+                filename: relativePath,
+                category: category,
+                size: file.size,
+                uploadTime: new Date().toISOString()
+            });
+        }
+
+        console.log(`成功上传 ${uploadedFiles.length} 个文件到分类: ${category}`);
+        res.json({ 
+            success: true, 
+            message: `成功上传 ${uploadedFiles.length} 个文件`,
+            files: uploadedFiles 
+        });
+    } catch (error) {
+        console.error('上传文件失败:', error);
+        res.status(500).json({ error: '上传失败: ' + error.message });
+    }
+});
+
+// API: 创建新分类
+app.post('/api/categories', async (req, res) => {
+    try {
+        const { categoryName } = req.body;
+        
+        if (!categoryName || typeof categoryName !== 'string') {
+            return res.status(400).json({ error: '分类名称不能为空' });
+        }
+        
+        // 验证分类名称（只允许字母、数字、下划线和中文）
+        if (!/^[\w\u4e00-\u9fa5]+$/.test(categoryName)) {
+            return res.status(400).json({ error: '分类名称只能包含字母、数字、下划线和中文字符' });
+        }
+        
+        const categoryPath = path.join(IMAGES_DIR, categoryName);
+        
+        // 检查分类是否已存在
+        try {
+            await fs.access(categoryPath);
+            return res.status(400).json({ error: '分类已存在' });
+        } catch (error) {
+            // 分类不存在，可以创建
+        }
+        
+        // 创建分类目录
+        await fs.mkdir(categoryPath, { recursive: true });
+        
+        console.log(`创建新分类: ${categoryName}`);
+        res.json({ success: true, message: `分类 "${categoryName}" 创建成功` });
+    } catch (error) {
+        console.error('创建分类失败:', error);
+        res.status(500).json({ error: '创建分类失败: ' + error.message });
+    }
+});
+
+// API: 删除图片
+app.delete('/api/images/:filename(*)', async (req, res) => {
+    try {
+        const filename = req.params.filename;
+        
+        if (!filename) {
+            return res.status(400).json({ error: '文件名不能为空' });
+        }
+        
+        const imagePath = path.join(IMAGES_DIR, filename);
+        
+        // 检查文件是否存在
+        try {
+            await fs.access(imagePath);
+        } catch (error) {
+            return res.status(404).json({ error: '文件不存在' });
+        }
+        
+        // 删除物理文件
+        await fs.unlink(imagePath);
+        
+        // 删除标签记录
+        let labels = {};
+        try {
+            const data = await fs.readFile(LABELS_FILE, 'utf8');
+            labels = JSON.parse(data);
+        } catch (error) {
+            if (error.code !== 'ENOENT') {
+                console.error('读取标签文件失败:', error);
+            }
+        }
+        
+        // 从标签记录中删除该图片
+        if (labels[filename]) {
+            delete labels[filename];
+            
+            // 保存更新后的标签文件
+            await fs.writeFile(LABELS_FILE, JSON.stringify(labels, null, 2));
+        }
+        
+        console.log(`删除图片: ${filename}`);
+        res.json({ success: true, message: `图片 "${filename}" 删除成功` });
+    } catch (error) {
+        console.error('删除图片失败:', error);
+        res.status(500).json({ error: '删除图片失败: ' + error.message });
+    }
+});
+
+// API: 批量删除图片
+app.delete('/api/images', async (req, res) => {
+    try {
+        const { filenames } = req.body;
+        
+        if (!filenames || !Array.isArray(filenames) || filenames.length === 0) {
+            return res.status(400).json({ error: '请提供要删除的文件列表' });
+        }
+        
+        const results = {
+            success: [],
+            failed: []
+        };
+        
+        // 读取标签文件
+        let labels = {};
+        try {
+            const data = await fs.readFile(LABELS_FILE, 'utf8');
+            labels = JSON.parse(data);
+        } catch (error) {
+            if (error.code !== 'ENOENT') {
+                console.error('读取标签文件失败:', error);
+            }
+        }
+        
+        // 逐个删除文件
+        for (const filename of filenames) {
+            try {
+                const imagePath = path.join(IMAGES_DIR, filename);
+                
+                // 检查文件是否存在
+                await fs.access(imagePath);
+                
+                // 删除物理文件
+                await fs.unlink(imagePath);
+                
+                // 从标签记录中删除
+                if (labels[filename]) {
+                    delete labels[filename];
+                }
+                
+                results.success.push(filename);
+            } catch (error) {
+                results.failed.push({ filename, error: error.message });
+            }
+        }
+        
+        // 保存更新后的标签文件
+        if (results.success.length > 0) {
+            await fs.writeFile(LABELS_FILE, JSON.stringify(labels, null, 2));
+        }
+        
+        console.log(`批量删除完成: 成功 ${results.success.length} 个，失败 ${results.failed.length} 个`);
+        res.json({ 
+            success: true, 
+            message: `删除完成: 成功 ${results.success.length} 个，失败 ${results.failed.length} 个`,
+            results 
+        });
+    } catch (error) {
+        console.error('批量删除图片失败:', error);
+        res.status(500).json({ error: '批量删除失败: ' + error.message });
     }
 });
 
