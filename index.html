@@ -1165,7 +1165,6 @@
                 total: 0,
                 positive: 0,
                 negative: 0,
-                byIP: {},
                 byAnnotator: {},
                 byCategory: {},
                 timeline: {}
@@ -1183,31 +1182,13 @@
                     stats.negative++;
                 }
                 
-                // 从图像路径提取IP信息（假设路径格式为 category/ip/filename）
+                // 从图像路径提取分类信息
                 const pathParts = imageId.split('/');
                 let category = 'unknown';
-                let ip = 'unknown';
                 
-                if (pathParts.length >= 2) {
+                if (pathParts.length >= 1) {
                     category = pathParts[0];
-                    ip = pathParts[1];
-                } else if (pathParts.length === 1) {
-                    // 如果只有一层，可能是直接的文件名
-                    const filename = pathParts[0];
-                    // 尝试从文件名中提取信息
-                    if (filename.includes('_')) {
-                        const parts = filename.split('_');
-                        ip = parts[0];
-                    }
                 }
-                
-                // 按IP统计
-                if (!stats.byIP[ip]) {
-                    stats.byIP[ip] = { total: 0, positive: 0, negative: 0 };
-                }
-                stats.byIP[ip].total++;
-                if (data.label === 'positive') stats.byIP[ip].positive++;
-                if (data.label === 'negative') stats.byIP[ip].negative++;
                 
                 // 按分类统计
                 if (!stats.byCategory[category]) {
@@ -1257,24 +1238,7 @@
                 </div>
             `;
             
-            // IP统计
-            if (Object.keys(stats.byIP).length > 0) {
-                html += '<div class="stats-section"><div class="stats-title">🎯 按IP统计</div>';
-                Object.entries(stats.byIP)
-                    .sort((a, b) => b[1].total - a[1].total)
-                    .forEach(([ip, data]) => {
-                        const ipPositiveRate = data.total > 0 ? ((data.positive / data.total) * 100).toFixed(1) : 0;
-                        const ipNegativeRate = data.total > 0 ? ((data.negative / data.total) * 100).toFixed(1) : 0;
-                        html += `
-                            <div class="stats-item">
-                                <strong>${ip}</strong>: 总计 ${data.total} | 
-                                侵权 ${data.positive} (${ipPositiveRate}%) | 
-                                不侵权 ${data.negative} (${ipNegativeRate}%)
-                            </div>
-                        `;
-                    });
-                html += '</div>';
-            }
+
             
             // 分类统计
             if (Object.keys(stats.byCategory).length > 0) {
@@ -1406,16 +1370,15 @@
                     allLabelsData = labels;
                 }
 
-                let csvContent = 'ImageID,Label,Annotator,Timestamp,Category,IP\n';
+                let csvContent = 'ImageID,Label,Annotator,Timestamp,Category\n';
                 
                 Object.entries(allLabelsData).forEach(([imageId, data]) => {
                     if (!data || !data.label) return;
                     
                     const pathParts = imageId.split('/');
-                    let category = pathParts.length >= 2 ? pathParts[0] : 'unknown';
-                    let ip = pathParts.length >= 2 ? pathParts[1] : (pathParts[0].includes('_') ? pathParts[0].split('_')[0] : 'unknown');
+                    let category = pathParts.length >= 1 ? pathParts[0] : 'unknown';
                     
-                    csvContent += `"${imageId}","${data.label}","${data.annotator || 'unknown'}","${data.timestamp || ''}","${category}","${ip}"\n`;
+                    csvContent += `"${imageId}","${data.label}","${data.annotator || 'unknown'}","${data.timestamp || ''}","${category}"\n`;
                 });
                 
                 const dataBlob = new Blob([csvContent], {type: 'text/csv'});
