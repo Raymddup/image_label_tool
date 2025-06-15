@@ -308,7 +308,7 @@ app.post('/api/upload', (req, res, next) => {
     }
     
     // 如果不在云端环境，继续处理上传
-    upload.array('images', 10)(req, res, async (err) => {
+    upload.array('images', 2000)(req, res, async (err) => {
         if (err) {
             console.error('Multer 上传错误:', err);
             return res.status(500).json({ error: '文件上传失败: ' + err.message });
