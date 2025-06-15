@@ -460,6 +460,18 @@
         .delete-btn:hover {
             background: #c82333 !important;
         }
+
+        .delete-category-btn {
+            background: #dc3545;
+            color: white;
+            font-size: 12px;
+            padding: 6px 12px;
+        }
+
+        .delete-category-btn:hover {
+            background: #c82333;
+            transform: translateY(-1px);
+        }
     </style>
 </head>
 <body>
@@ -547,6 +559,7 @@
                             <option value="uploads">默认分类</option>
                         </select>
                         <button type="button" onclick="showNewCategoryInput()">+ 新建分类</button>
+                        <button type="button" onclick="showDeleteCategoryInput()" class="delete-category-btn">🗑️ 删除分类</button>
                     </div>
                     
                     <div id="newCategoryGroup" class="form-group" style="display: none;">
@@ -554,6 +567,15 @@
                         <input type="text" id="newCategoryName" placeholder="输入分类名称">
                         <button type="button" onclick="createNewCategory()">创建</button>
                         <button type="button" onclick="hideNewCategoryInput()">取消</button>
+                    </div>
+                    
+                    <div id="deleteCategoryGroup" class="form-group" style="display: none;">
+                        <label for="deleteCategorySelect">选择要删除的分类:</label>
+                        <select id="deleteCategorySelect">
+                            <option value="">请选择分类</option>
+                        </select>
+                        <button type="button" onclick="deleteSelectedCategory()" class="delete-btn">删除</button>
+                        <button type="button" onclick="hideDeleteCategoryInput()">取消</button>
                     </div>
                     
                     <div class="form-group">
@@ -1417,6 +1439,7 @@
             } else {
                 panel.style.display = 'none';
                 hideNewCategoryInput();
+                hideDeleteCategoryInput();
                 clearUploadResults();
             }
         }
@@ -1455,6 +1478,85 @@
             document.getElementById('newCategoryName').value = '';
         }
 
+        function showDeleteCategoryInput() {
+            document.getElementById('deleteCategoryGroup').style.display = 'block';
+            loadCategoriesForDelete();
+        }
+
+        function hideDeleteCategoryInput() {
+            document.getElementById('deleteCategoryGroup').style.display = 'none';
+            document.getElementById('deleteCategorySelect').innerHTML = '<option value="">请选择分类</option>';
+        }
+
+        async function loadCategoriesForDelete() {
+            try {
+                const response = await fetch('/api/categories');
+                if (response.ok) {
+                    const categories = await response.json();
+                    const select = document.getElementById('deleteCategorySelect');
+                    
+                    // 清空现有选项
+                    select.innerHTML = '<option value="">请选择分类</option>';
+                    
+                    // 添加可删除的分类（排除系统默认分类）
+                    categories.forEach(category => {
+                        if (category !== 'root' && category !== 'uploads') {
+                            const option = document.createElement('option');
+                            option.value = category;
+                            option.textContent = category;
+                            select.appendChild(option);
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('加载分类失败:', error);
+            }
+        }
+
+        async function deleteSelectedCategory() {
+            const categorySelect = document.getElementById('deleteCategorySelect');
+            const categoryName = categorySelect.value;
+            
+            if (!categoryName) {
+                showUploadError('请选择要删除的分类');
+                return;
+            }
+            
+            // 确认删除
+            if (!confirm(`确定要删除分类 "${categoryName}" 吗？\n\n注意：只能删除空的分类目录。`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/categories/${encodeURIComponent(categoryName)}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showUploadSuccess(result.message);
+                    hideDeleteCategoryInput();
+                    
+                    // 重新加载主页面的分类列表
+                    await loadCategories();
+                    updateCategorySelector();
+                    
+                    // 重新加载上传页面的分类列表
+                    await loadCategoriesForUpload();
+                } else {
+                    // 检查是否是云端部署限制
+                    if (result.error && result.error.includes('云端部署环境不支持')) {
+                        showUploadError('⚠️ 云端部署限制\n\n' + result.error + '\n\n详细说明请查看项目中的 VERCEL_LIMITATIONS.md 文件。');
+                    } else {
+                        showUploadError(result.error || '删除分类失败');
+                    }
+                }
+            } catch (error) {
+                showUploadError('删除分类失败: ' + error.message);
+            }
+        }
+
         async function createNewCategory() {
             const categoryName = document.getElementById('newCategoryName').value.trim();
             
@@ -1483,7 +1585,11 @@
                     showUploadSuccess(result.message);
                     hideNewCategoryInput();
                     
-                    // 重新加载分类列表并选择新创建的分类
+                    // 重新加载主页面的分类列表
+                    await loadCategories();
+                    updateCategorySelector();
+                    
+                    // 重新加载上传页面的分类列表并选择新创建的分类
                     await loadCategoriesForUpload();
                     
                     // 确保分类已加载完成后再选择
