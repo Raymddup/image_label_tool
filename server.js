@@ -134,9 +134,28 @@ app.get('/api/images', async (req, res) => {
 // API: 获取分类列表
 app.get('/api/categories', async (req, res) => {
     try {
+        // 获取所有包含图片的分类
         const images = await getAllImages(IMAGES_DIR);
-        const categories = [...new Set(images.map(img => img.category))];
-        res.json(categories);
+        const categoriesFromImages = [...new Set(images.map(img => img.category))];
+        
+        // 获取所有分类目录（包括空目录）
+        const categoriesFromDirs = [];
+        try {
+            const items = await fs.readdir(IMAGES_DIR, { withFileTypes: true });
+            for (const item of items) {
+                if (item.isDirectory()) {
+                    categoriesFromDirs.push(item.name);
+                }
+            }
+        } catch (error) {
+            console.log('读取分类目录失败:', error);
+        }
+        
+        // 合并两个列表，去重
+        const allCategories = [...new Set([...categoriesFromImages, ...categoriesFromDirs])];
+        
+        console.log('找到的分类:', allCategories);
+        res.json(allCategories);
     } catch (error) {
         console.error('获取分类列表失败:', error);
         res.status(500).json({ error: '无法获取分类列表' });
@@ -391,6 +410,56 @@ app.post('/api/categories', async (req, res) => {
             stack: error.stack
         });
         res.status(500).json({ error: '创建分类失败: ' + error.message });
+    }
+});
+
+// API: 删除分类
+app.delete('/api/categories/:categoryName', async (req, res) => {
+    try {
+        // 检查是否在 Vercel 等无服务器环境中
+        if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+            return res.status(400).json({ 
+                error: '云端部署环境不支持删除分类目录。请在本地项目中手动删除分类文件夹，然后推送到 GitHub 重新部署。' 
+            });
+        }
+        
+        const categoryName = req.params.categoryName;
+        
+        if (!categoryName || categoryName.trim() === '') {
+            return res.status(400).json({ error: '分类名称不能为空' });
+        }
+        
+        // 不允许删除特殊分类
+        if (categoryName === 'root' || categoryName === 'uploads') {
+            return res.status(400).json({ error: '不能删除系统默认分类' });
+        }
+        
+        const categoryPath = path.join(IMAGES_DIR, categoryName);
+        console.log(`尝试删除分类目录: ${categoryPath}`);
+        
+        // 检查分类目录是否存在
+        try {
+            await fs.access(categoryPath);
+        } catch (error) {
+            return res.status(404).json({ error: '分类不存在' });
+        }
+        
+        // 检查目录是否为空
+        const items = await fs.readdir(categoryPath);
+        if (items.length > 0) {
+            return res.status(400).json({ 
+                error: `分类 "${categoryName}" 不为空，包含 ${items.length} 个文件。请先删除分类中的所有文件。` 
+            });
+        }
+        
+        // 删除空目录
+        await fs.rmdir(categoryPath);
+        
+        console.log(`删除分类成功: ${categoryName}`);
+        res.json({ success: true, message: `分类 "${categoryName}" 删除成功` });
+    } catch (error) {
+        console.error('删除分类失败:', error);
+        res.status(500).json({ error: '删除分类失败: ' + error.message });
     }
 });
 
